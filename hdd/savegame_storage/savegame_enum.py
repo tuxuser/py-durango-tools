@@ -40,7 +40,7 @@ ContainerIdxEntry = Struct(
     "folder_guid" / UUIDAdapter(),
     "filetime" / Int64ul,
     "unknown2" / HexDump(Bytes(8)),
-    "set_if_available" / Int32ul,
+    "filesize" / Int32ul,
     "unknown3" / HexDump(Bytes(4))
 )
 
@@ -115,7 +115,7 @@ class SavegameEnumerator(object):
                 savegame_content[guid].update({'savegames':list()})
 
             for savegame in parsed_index.files:
-                if not savegame.set_if_available:
+                if not savegame.filesize:
                     log.debug("Savegame id: %s not available, skipping" % str(savegame.folder_guid))
                     continue
                 parsed_blob = self._parse_savegameblob(folderpath, str(savegame.folder_guid), savegame.blob_number)
@@ -128,6 +128,7 @@ class SavegameEnumerator(object):
                 savegame_content[guid]['savegames'].append({
                     'filetime': savegame.filetime,
                     'filename': savegame.filename,
+                    'filesize': savegame.filesize,
                     'text': savegame.text,
                     'folder_guid': str(savegame.folder_guid),
                     'file_guid': str(parsed_blob.file_guid),
