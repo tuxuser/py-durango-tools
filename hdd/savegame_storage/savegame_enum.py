@@ -7,6 +7,7 @@ import json
 import argparse
 import logging
 
+from datetime import datetime,timedelta
 from construct import this, Struct, String, PascalString, Array, Padding
 from construct import Int8ul, Int16ul, Int32ul, Int64ul, HexDump, Bytes
 from adapters import PascalStringMach2, UUIDAdapter
@@ -37,11 +38,10 @@ ContainerIdxEntry = Struct(
     "blob_number" / Int8ul,
     "unknown1" / Int32ul,
     "folder_guid" / UUIDAdapter(),
-    "unknown2" / HexDump(Bytes(4)),
-    "unknown3" / HexDump(Bytes(4)),
-    "unknown4" / HexDump(Bytes(8)),
+    "filetime" / Int64ul,
+    "unknown2" / HexDump(Bytes(8)),
     "set_if_available" / Int32ul,
-    "unknown5" / HexDump(Bytes(4))
+    "unknown3" / HexDump(Bytes(4))
 )
 
 """
@@ -52,12 +52,14 @@ ContainerIndex = Struct(
     "file_count" / Int32ul,
     "name" / PascalStringMach2(Int32ul, encoding="utf16"),
     "aum_id" / PascalStringMach2(Int32ul, encoding="utf16"),
-    "unknown1" / HexDump(Bytes(4)),
-    "unknown2" / HexDump(Bytes(4)),
-    "unknown3" / HexDump(Bytes(4)),
+    "filetime" / Int64ul,
+    "unknown" / HexDump(Bytes(4)),
     "id" / PascalStringMach2(Int32ul, encoding="utf16"),
     "files" / Array(this.file_count, ContainerIdxEntry)
 )
+
+def datetime_from_filetime(nsecs):
+    return datetime(1601,1,1) + timedelta(microseconds=nsecs / 10)
 
 class SavegameEnumerator(object):
     def __init__(self):
@@ -124,11 +126,12 @@ class SavegameEnumerator(object):
                     savegame.filename, savegame.text, str(savegame.folder_guid), str(parsed_blob.file_guid)
                 ))
                 savegame_content[guid]['savegames'].append({
+                    'filetime': savegame.filetime,
                     'filename': savegame.filename,
                     'text': savegame.text,
                     'folder_guid': str(savegame.folder_guid),
                     'file_guid': str(parsed_blob.file_guid),
-                    'xuid': xuid,
+                    'xuid': int(xuid),
                     'blob_number': savegame.blob_number
                 })
         return savegame_content
