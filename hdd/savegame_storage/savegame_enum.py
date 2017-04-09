@@ -40,7 +40,8 @@ ContainerIdxEntry = Struct(
     "unknown2" / HexDump(Bytes(4)),
     "unknown3" / HexDump(Bytes(4)),
     "unknown4" / HexDump(Bytes(8)),
-    "unknown5" / HexDump(Bytes(8))
+    "set_if_available" / Int32ul,
+    "unknown5" / HexDump(Bytes(4))
 )
 
 """
@@ -81,7 +82,7 @@ class SavegameEnumerator(object):
             with io.open(filepath, 'rb') as f:
                 data = f.read()
         except FileNotFoundError as e:
-            log.warning("Savegame blob %s not existant -> skipping, err: %s" % (savegame_guid, e))
+            log.warning("Savegame blob %s not existant -> should be there normally!, err: %s" % (savegame_guid, e))
             return
         return ContainerBlob.parse(data)
 
@@ -116,6 +117,9 @@ class SavegameEnumerator(object):
             })
 
             for savegame in parsed_index.files:
+                if not savegame.set_if_available:
+                    log.debug("Savegame id: %s not available, skipping" % str(savegame.guid))
+                    continue
                 parsed_blob = self._parse_savegameblob(folderpath, str(savegame.guid), savegame.blob_number)
                 if not parsed_blob:
                     continue
