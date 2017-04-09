@@ -27,7 +27,7 @@ ContainerBlob = Struct(
     "unknown2"/ Int32ul,
     "magic" / Bytes(8),
     "data" / Bytes(0x88),
-    "guid" / UUIDAdapter()
+    "file_guid" / UUIDAdapter()
 )
 
 ContainerIdxEntry = Struct(
@@ -36,7 +36,7 @@ ContainerIdxEntry = Struct(
     "text" / PascalStringMach2(Int32ul, encoding="utf16"),
     "blob_number" / Int8ul,
     "unknown1" / Int32ul,
-    "guid" / UUIDAdapter(),
+    "folder_guid" / UUIDAdapter(),
     "unknown2" / HexDump(Bytes(4)),
     "unknown3" / HexDump(Bytes(4)),
     "unknown4" / HexDump(Bytes(8)),
@@ -114,20 +114,20 @@ class SavegameEnumerator(object):
 
             for savegame in parsed_index.files:
                 if not savegame.set_if_available:
-                    log.debug("Savegame id: %s not available, skipping" % str(savegame.guid))
+                    log.debug("Savegame id: %s not available, skipping" % str(savegame.folder_guid))
                     continue
-                parsed_blob = self._parse_savegameblob(folderpath, str(savegame.guid), savegame.blob_number)
+                parsed_blob = self._parse_savegameblob(folderpath, str(savegame.folder_guid), savegame.blob_number)
                 if not parsed_blob:
                     continue
-                savegame_file = self._generate_guid_filename(str(parsed_blob.guid))
+                savegame_file = self._generate_guid_filename(str(parsed_blob.file_guid))
                 log.debug("Enumerated savegame: %s %s (file: %s/%s)" % (
-                    savegame.filename, savegame.text, str(savegame.guid), str(parsed_blob.guid)
+                    savegame.filename, savegame.text, str(savegame.folder_guid), str(parsed_blob.file_guid)
                 ))
                 savegame_content[guid]['savegames'].append({
                     'filename': savegame.filename,
                     'text': savegame.text,
-                    'folder_guid': str(savegame.guid),
-                    'file_guid': str(parsed_blob.guid),
+                    'folder_guid': str(savegame.folder_guid),
+                    'file_guid': str(parsed_blob.file_guid),
                     'xuid': xuid,
                     'blob_number': savegame.blob_number
                 })
