@@ -103,18 +103,14 @@ class SavegameEnumerator(object):
             # Initially create guid dict
             if not savegame_content.get(guid):
                 savegame_content.update({guid: dict()})
-            # Initially create xuids dict
-            if not savegame_content[guid].get('xuids'):
-                savegame_content[guid].update({'xuids': dict()})
-            if not savegame_content[guid]['xuids'].get(xuid):
-                savegame_content[guid]['xuids'].update({xuid: dict()})
-            # Fill the savegame dict
-            savegame_content[guid].update({
-                'name': parsed_index.name,
-                'aum_id': parsed_index.aum_id,
-                'type': parsed_index.type,
-                'id': parsed_index.id
-            })
+                savegame_content[guid].update({
+                    'name': parsed_index.name,
+                    'aum_id': parsed_index.aum_id,
+                    'type': parsed_index.type,
+                    'id': parsed_index.id
+                })
+            if not savegame_content[guid].get('savegames'):
+                savegame_content[guid].update({'savegames':list()})
 
             for savegame in parsed_index.files:
                 if not savegame.set_if_available:
@@ -127,12 +123,14 @@ class SavegameEnumerator(object):
                 log.debug("Enumerated savegame: %s %s (file: %s/%s)" % (
                     savegame.filename, savegame.text, str(savegame.guid), str(parsed_blob.guid)
                 ))
-                savegame_content[guid]['xuids'][xuid].update({str(savegame.guid): {
+                savegame_content[guid]['savegames'].append({
                     'filename': savegame.filename,
                     'text': savegame.text,
-                    'guid': str(parsed_blob.guid),
+                    'folder_guid': str(savegame.guid),
+                    'file_guid': str(parsed_blob.guid),
+                    'xuid': xuid,
                     'blob_number': savegame.blob_number
-                }})
+                })
         return savegame_content
 
     def get_folderlist(self, path):
