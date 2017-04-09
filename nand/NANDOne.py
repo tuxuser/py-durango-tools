@@ -12,6 +12,7 @@ Credits:
 import io
 import os
 import sys
+import logging
 import hashlib
 import uuid
 import binascii
@@ -21,6 +22,9 @@ from construct import Int8ul, Int16ul, Int16ub
 from construct import Int32ul, Int32ub, Int64ul, Int64ub
 from construct import String, Bytes, Array, Padding, Struct
 
+logging.basicConfig(format='[%(levelname)s] - %(name)s - %(message)s', level=logging.DEBUG)
+log = logging.getLogger('nand_one')
+
 APP_NAME = 'NANDOne'
 BUILD_VER = 'v0.03'
 
@@ -29,8 +33,8 @@ FLASH_SIZE_RAW = 0x13C000000
 LOG_BLOCK_SZ = 0x1000
 
 HEADER_SIZE = 1024
-HEADER_MAGIC = b'XBFS'
-HEADER_MAGIC = Int32ub.parse(HEADER_MAGIC)
+# Reverse magic
+HEADER_MAGIC = b'XBFS'[::-1]
 
 HEADER_HASH_SIZE = 32
 
@@ -83,7 +87,7 @@ FlashFileEntry = Struct(
 )
 
 FlashHeader = Struct(
-    "magic" / Int32ul, # HEADER_MAGIC
+    "magic" / Bytes(4), # HEADER_MAGIC
     "format_version" / Int8ul,
     "sequence_version" / Int8ul,
     "layout_version" / Int16ul,
@@ -158,19 +162,19 @@ class DurangoXbfsTable(object):
             return (name, fil)
 
     def print_info(self):
-        print("-- XBFS table info --")
-        print("Header Offset: 0x%08x" % self.header_offset)
-        print("Format: %i" % self.format_version)
-        print("Sequence: %i" % self.sequence_version)
-        print("Layout: %i" % self.layout_version)
-        print("Guid: %s" % self.guid)
-        print("Hash: %s" % self.hash)
+        log.info("-- XBFS table info --")
+        log.info("Header Offset: 0x%08x" % self.header_offset)
+        log.info("Format: %i" % self.format_version)
+        log.info("Sequence: %i" % self.sequence_version)
+        log.info("Layout: %i" % self.layout_version)
+        log.info("Guid: %s" % self.guid)
+        log.info("Hash: %s" % self.hash)
 
     def print_filelist(self):
-        print("-- XBFS filelist --")
+        log.info("-- XBFS filelist --")
         for name, offset_tuple in self.files.items():
             offset, size = offset_tuple
-            print("off: 0x%08x, sz: 0x%08x, file: %s" % (offset, size, name))
+            log.info("off: 0x%08x, sz: 0x%08x, file: %s" % (offset, size, name))
 
 class DurangoNand(object):
     def __init__(self, filename):
@@ -245,6 +249,9 @@ class DurangoNand(object):
     def get_latest_xbfs_table(self):
         return self.get_xbfs_table_by_sequence(self.latest_sequence_version)
 
+    def get_xbfs_sequence_list(self):
+        return [f for f in dict(self._xbfs_tables)]
+
     def extract_files_from_table(self, table):
         dirname = "%s_%s" % (self.filename, table.guid)
         with io.open(self.filename, "rb") as f:
@@ -252,7 +259,7 @@ class DurangoNand(object):
                 offset, size = offset_tuple
                 f.seek(offset)
                 data = f.read(size)
-                print("Extracting file 0x%08x : %s " % (offset, name))
+                log.info("Extracting file 0x%08x : %s " % (offset, name))
                 self._save_file(data, dirname, name)
 
     def extract_table_by_seq(self, sequence_num):
@@ -261,8 +268,8 @@ class DurangoNand(object):
 
     def parse(self):
         if not self.is_valid:
-            print("ERROR: NAND dump does not match expected filesize!")
-            print("Expecting 0x%08x or 0x%08x bytes dump!" % (FLASH_SIZE_LOG, FLASH_SIZE_RAW))
+            log.error("ERROR: NAND dump does not match expected filesize!")
+            log.error("Expecting 0x%08x or 0x%08x bytes dump!" % (FLASH_SIZE_LOG, FLASH_SIZE_RAW))
             return
 
         with io.open(self.filename, "rb") as f:
@@ -289,23 +296,24 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Parse raw Durango Nanddump')
     parser.add_argument('filename', type=str, help='input filename')
     parser.add_argument('--extract', action='store_true', help='extract files from nand')
-    print("%s %s started" % (APP_NAME, BUILD_VER))
+    log.info("%s %s started" % (APP_NAME, BUILD_VER))
 
     args = parser.parse_args()
 
     if not os.path.isfile(args.filename):
-        print("ERROR: file %s does not exist!" % args.filename)
+        log.error("ERROR: file %s does not exist!" % args.filename)
         sys.exit(-1)
     
-    print("Nanddump file: %s" % args.filename)
+    log.info("Nanddump file: %s" % args.filename)
     nand = DurangoNand(args.filename)
-    print("Dump type: %s" % nand.dump_type)
+    log.info("Dump type: %s" % nand.dump_type)
     nand.parse()
 
     table = nand.get_latest_xbfs_table()
-    print("Latest sequence num: %i" % table.sequence_version)
+    log.info("Available Sequences: %s" % nand.get_xbfs_sequence_list())
+    log.info("Latest sequence num: %i" % table.sequence_version)
     table.print_info()
     table.print_filelist()
     if args.extract:
-        print("Extracting files...")
+        log.info("Extracting files...")
         nand.extract_files_from_table(table)
