@@ -4,6 +4,7 @@ import sys
 import io
 import os
 import json
+import argparse
 import logging
 from uuid import UUID
 
@@ -150,18 +151,17 @@ class DurangoContentDirectory(object):
         return files
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        log.error("No filepath argument given!")
-        sys.exit(-1)
+    parser = argparse.ArgumentParser(description='Enumerate external hdd content')
+    parser.add_argument('path', type=str, help='input path to external drive')
+    parser.add_argument('--output', help='Json report output (otherwise its stdout)')
+    args = parser.parse_args()
 
-    folderpath = sys.argv[1]
-    log.info("Parsing folder: %s" % folderpath)
-
-    if not os.path.exists(folderpath):
-        log.critical("Directory %s does not exist!" % folderpath)
+    if not os.path.exists(args.path):
+        log.critical("Directory %s does not exist!" % args.path)
         sys.exit(-2)
 
-    content_dir = DurangoContentDirectory(folderpath)
+    log.info("Parsing folder: %s" % args.path)
+    content_dir = DurangoContentDirectory(args.path)
     content_list = content_dir.parse()
 
     for group in ALL_MEDIAGROUPS:
@@ -184,8 +184,9 @@ if __name__ == "__main__":
 
     log.info('Scraping details for content...')
     scraped = scraper.scrape(content_list)
-    log.info('Where should the report be saved?')
-    filename = input("Filename: ")
-    with io.open(filename, 'w') as f:
-        json.dump(scraped, f, indent=3)
+    if args.output:
+        with io.open(args.output, 'w') as f:
+            json.dump(scraped, f, indent=2)
+    else:
+        print(json.dumps(scraped, indent=2))
     log.info('Done! Have a nice day')

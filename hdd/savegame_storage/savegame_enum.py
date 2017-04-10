@@ -168,3 +168,4 @@ if __name__ == "__main__":
             json.dump(parsed, f, indent=2)
     else:
         print(json.dumps(parsed, indent=2))
+    log.info('Done! Have a nice day')
