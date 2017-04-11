@@ -152,12 +152,24 @@ class DurangoContentDirectory(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Enumerate external hdd content')
     parser.add_argument('path', type=str, help='input path to external drive')
+    parser.add_argument('--email', help='Microsoft account email')
+    parser.add_argument('--password', help='Microsoft account password')
     parser.add_argument('--output', help='Json report output (otherwise its stdout)')
     args = parser.parse_args()
 
     if not os.path.exists(args.path):
         log.critical("Directory %s does not exist!" % args.path)
         sys.exit(-2)
+
+    scraper = EDSScraper()
+    log.debug("Initializing EDS Scraper...")
+    log.info("Logging in login to XBL now...")
+    log.info("If this fails you need to supply email and password as args")
+
+    ret = scraper.create_client(args.email, args.password)
+    if not ret:
+        log.error('Failed to initialize EDS Scraper!')
+        sys.exit(-3)
 
     log.info("Parsing folder: %s" % args.path)
     content_dir = DurangoContentDirectory(args.path)
@@ -167,19 +179,6 @@ if __name__ == "__main__":
         log.info('Found %i %s containers...' % (
             len(content_list[group]), group
         ))
-
-    scraper = EDSScraper()
-    log.debug("Initializing EDS Scraper...")
-    log.info("Need to login to XBL now...")
-    log.info("If you already did that successfully lately, tokens were saved")
-    log.info("In that case: Just press ENTER when you asked for credentials")
-
-    email = input("Microsoft Account Email: ")
-    password = input("Password: ")
-    ret = scraper.create_client(email, password)
-    if not ret:
-        log.error('Failed to initialize EDS Scraper!')
-        sys.exit(-3)
 
     log.info('Scraping details for content...')
     scraped = scraper.scrape(content_list)
