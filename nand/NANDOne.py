@@ -14,13 +14,13 @@ import os
 import sys
 import logging
 import hashlib
-import uuid
 import binascii
 import argparse
 
 from construct import Int8ul, Int16ul, Int16ub
 from construct import Int32ul, Int32ub, Int64ul, Int64ub
 from construct import String, Bytes, Array, Padding, Struct
+from common.adapters import UUIDAdapter
 
 logging.basicConfig(format='[%(levelname)s] - %(name)s - %(message)s', level=logging.DEBUG)
 log = logging.getLogger('nand_one')
@@ -96,7 +96,7 @@ FlashHeader = Struct(
     "unknown_3" / Int64ul,
     "files" / Array(FLASH_FILES_COUNT, FlashFileEntry),
     Padding(544),
-    "guid" / Bytes(GUID_SIZE),
+    "guid" / UUIDAdapter(),
     "hash" / Bytes(HEADER_HASH_SIZE) # SHA256 checksum
 )
 

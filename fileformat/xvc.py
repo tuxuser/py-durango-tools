@@ -2,7 +2,7 @@ import logging
 
 from construct import Struct, Bytes
 from construct import Int16ul, Int16sl, Int32ul, Int32sl, Int64ul, Int64sl
-from common import UUIDAdapter
+from common.adapters import UUIDAdapter
 
 log = logging.getLogger('fileformat.xvd')
 

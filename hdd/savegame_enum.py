@@ -7,12 +7,9 @@ import json
 import argparse
 import logging
 
-from datetime import datetime,timedelta
 from construct import this, Struct, String, PascalString, Array, Padding
 from construct import Int8ul, Int16ul, Int32ul, Int64ul, HexDump, Bytes
-from adapters import PascalStringMach2, UUIDAdapter
-
-from uuid import UUID
+from common.adapters import PascalStringUtf16, UUIDAdapter, FILETIMEAdapter
 
 logging.basicConfig(format='[%(levelname)s] - %(name)s - %(message)s', level=logging.DEBUG)
 log = logging.getLogger('savegame_enum')
@@ -32,13 +29,13 @@ ContainerBlob = Struct(
 )
 
 ContainerIdxEntry = Struct(
-    "filename" / PascalStringMach2(Int32ul, encoding="utf16"),
+    "filename" / PascalStringUtf16(Int32ul, encoding="utf16"),
     Padding(4),
-    "text" / PascalStringMach2(Int32ul, encoding="utf16"),
+    "text" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "blob_number" / Int8ul,
     "unknown1" / Int32ul,
     "folder_guid" / UUIDAdapter(),
-    "filetime" / Int64ul,
+    "filetime" / FILETIMEAdapter(),
     "unknown2" / HexDump(Bytes(8)),
     "filesize" / Int32ul,
     "unknown3" / HexDump(Bytes(4))
@@ -50,16 +47,13 @@ Structure of containers.index file
 ContainerIndex = Struct(
     "type" / Int32ul,
     "file_count" / Int32ul,
-    "name" / PascalStringMach2(Int32ul, encoding="utf16"),
-    "aum_id" / PascalStringMach2(Int32ul, encoding="utf16"),
-    "filetime" / Int64ul,
+    "name" / PascalStringUtf16(Int32ul, encoding="utf16"),
+    "aum_id" / PascalStringUtf16(Int32ul, encoding="utf16"),
+    "filetime" / FILETIMEAdapter(),
     "unknown" / HexDump(Bytes(4)),
-    "id" / PascalStringMach2(Int32ul, encoding="utf16"),
+    "id" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "files" / Array(this.file_count, ContainerIdxEntry)
 )
-
-def datetime_from_filetime(nsecs):
-    return datetime(1601,1,1) + timedelta(microseconds=nsecs / 10)
 
 class SavegameEnumerator(object):
     def __init__(self):
@@ -126,7 +120,7 @@ class SavegameEnumerator(object):
                     savegame.filename, savegame.text, str(savegame.folder_guid), str(parsed_blob.file_guid)
                 ))
                 savegame_content[guid]['savegames'].append({
-                    'filetime': savegame.filetime,
+                    'filetime': str(savegame.filetime),
                     'filename': savegame.filename,
                     'filesize': savegame.filesize,
                     'text': savegame.text,

@@ -7,8 +7,9 @@ from binascii import hexlify, unhexlify
 
 from construct import Struct, Bytes, Padding, String
 from construct import Int16ul, Int32ul, Int32sl, Int64ul, Int64sl
-from fileformat.common import UUIDAdapter, Constant, Enum
-#from common import UUIDAdapter, Constant, Enum
+from common.adapters import UUIDAdapter
+from common.enum import Enum
+from common.constants import HASH_SIZE
 
 log = logging.getLogger('fileformat.xvd')
 
@@ -119,8 +120,8 @@ XvdFileHeader = Struct(
     "drive_size" / Int64ul,                  # 0x218
     "content_id" / UUIDAdapter(),            # 0x220
     "user_id" / UUIDAdapter(),               # 0x230
-    "block_hash" / Bytes(Constant.HASH_SIZE),# 0x240
-    "xvcdata_hash" / Bytes(Constant.HASH_SIZE),# 0x260
+    "block_hash" / Bytes(HASH_SIZE),         # 0x240
+    "xvcdata_hash" / Bytes(HASH_SIZE),       # 0x260
     "unknown1_hashtablerelated" / Int32ul,   # 0x280
     "content_type" / Int32ul,                # 0x284
     "embedded_xvd_length" / Int32ul,         # 0x288

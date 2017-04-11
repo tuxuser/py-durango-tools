@@ -1,6 +1,11 @@
-from io import BytesIO
 from uuid import UUID
-from construct import Subconstruct, StringEncoded, GreedyBytes, Bytes, Adapter
+from io import BytesIO
+from datetime import datetime,timedelta
+from construct import Subconstruct, StringEncoded, GreedyBytes, Bytes, Adapter, Int64ul
+
+"""
+Adapters and other Construct utility classes
+"""
 
 class UUIDAdapter(Adapter):
     def __init__(self):
@@ -10,10 +15,26 @@ class UUIDAdapter(Adapter):
         super(self.__class__, self).__init__(Bytes(0x10))
 
     def _encode(self, obj, context):
-            return obj.bytes
+        return obj.bytes
 
     def _decode(self, obj, context):
-            return UUID(bytes_le=obj)
+        return UUID(bytes_le=obj)
+
+class FILETIMEAdapter(Adapter):
+    def __init__(self):
+        """
+        Construct-Adapter for Windows FILETIME (Int64ul)
+        Number of 100-nanosecond intervals since January 1, 1601 (UTC)
+        MSDN: https://msdn.microsoft.com/en-us/library/windows/desktop/ms724284(v=vs.85).aspx
+        """
+        super(self.__class__, self).__init__(Int64ul)
+    
+    def _encode(self, obj, context):
+        timedelta = obj - datetime(1601,1,1)
+        return timedelta.total_seconds() * 100000000
+
+    def _decode(self, obj, context):
+        return datetime(1601,1,1) + timedelta(microseconds=obj / 10)
 
 def _read_stream(stream, length):
     # if not isinstance(length, int):
@@ -45,5 +66,5 @@ class PrefixedMach2(Subconstruct):
     def _sizeof(self, context, path):
         return self.lengthfield._sizeof(context, path) + self.subcon._sizeof(context, path)
 
-def PascalStringMach2(lengthfield, encoding=None):
+def PascalStringUtf16(lengthfield, encoding=None):
     return StringEncoded(PrefixedMach2(lengthfield, GreedyBytes), encoding)

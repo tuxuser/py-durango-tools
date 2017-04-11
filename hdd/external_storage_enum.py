@@ -6,7 +6,6 @@ import os
 import json
 import argparse
 import logging
-from uuid import UUID
 
 from fileformat.xvd import XvdFile, XvdContentType
 from fileformat.xvd import XVD_HEADER_SIZE, XVD_TYPE_APP, XVD_TYPE_GAME
