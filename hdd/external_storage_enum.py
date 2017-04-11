@@ -13,7 +13,7 @@ from fileformat.xvd import XVD_HEADER_SIZE, XVD_TYPE_APP, XVD_TYPE_GAME
 from xbox_webapi.authentication.auth import AuthenticationManager
 from xbox_webapi.common.exceptions import AuthenticationException
 from xbox_webapi.api.provider import XboxLiveClient
-from xbox_webapi.api.endpoints.eds import MediaGroup
+from xbox_webapi.api.eds.types import MediaGroup
 
 logging.basicConfig(format='[%(levelname)s] - %(name)s - %(message)s', level=logging.DEBUG)
 log = logging.getLogger('content_enum')
@@ -78,7 +78,7 @@ class EDSScraper(object):
                 details = self.scrape_details(product_id_list, media_group)
                 if not details:
                     log.error('Failed scraping %s' % product_id_list)
-                    return
+                    continue
                 
                 # Find matching node for id in returned list of items
                 for entry in chunk:
