@@ -30,7 +30,7 @@ ContainerBlob = Struct(
 
 ContainerIdxEntry = Struct(
     "filename" / PascalStringUtf16(Int32ul, encoding="utf16"),
-    Padding(4),
+    "filename_alt" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "text" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "blob_number" / Int8ul,
     "unknown1" / Int32ul,
@@ -55,6 +55,10 @@ ContainerIndex = Struct(
     "files" / Array(this.file_count, ContainerIdxEntry)
 )
 
+class SavegameType(object):
+    USER = "u"
+    MACHINE = "m"
+
 class SavegameEnumerator(object):
     def __init__(self):
         pass
@@ -62,13 +66,18 @@ class SavegameEnumerator(object):
     def _generate_guid_filename(self, guid):
         return "{%s}" % guid.upper()
 
-    def _get_xuid_and_guid_from_foldername(self, foldername):
+    def _get_xuid_guid_type_from_foldername(self, foldername):
         elements = foldername.split('_')
-        if len(elements) < 3:
-            return None, None
-        xuid = elements[1]
-        guid = elements[2]
-        return xuid, guid
+        save_type = elements[0]
+        if SavegameType.MACHINE == save_type:
+            guid = elements[1]
+            xuid = "0"
+        elif SavegameType.USER == save_type:
+            xuid = elements[1]
+            guid = elements[2]
+        else:
+            raise Exception("Encountered unknown savegametype")
+        return xuid, guid, save_type
 
     def _parse_savegameblob(self, path, savegame_guid, blob_num):
         guid_folder = self._generate_guid_filename(savegame_guid)
@@ -85,13 +94,14 @@ class SavegameEnumerator(object):
     def parse_savegamefolders(self, folderlist):
         savegame_content = dict()
         for folderpath in folderlist:
-            # foldername: 'u_xuid_guid'
+            # foldername: 'u_xuid_guid' or 'm_guid' 
             foldername = os.path.basename(folderpath)
-            xuid, guid = self._get_xuid_and_guid_from_foldername(foldername)
+            xuid, guid, save_type = self._get_xuid_guid_type_from_foldername(foldername)
             # Assemble path to CONTAINERS_INDEX
             index_fpath = os.path.join(folderpath, CONTAINERS_INDEX)
             with io.open(index_fpath, 'rb') as f:
                 data = f.read()
+            log.debug("Parsing folder %s ..." % folderpath)
             parsed_index = ContainerIndex.parse(data)
             log.debug("Parsing %s (AUM: %s, xuid: %s, guid: %s) with %i files" % (
                 parsed_index.name, parsed_index.aum_id, xuid, guid, len(parsed_index.files))
@@ -122,12 +132,14 @@ class SavegameEnumerator(object):
                 savegame_content[guid]['savegames'].append({
                     'filetime': str(savegame.filetime),
                     'filename': savegame.filename,
+                    'filename_alt': savegame.filename_alt,
                     'filesize': savegame.filesize,
                     'text': savegame.text,
                     'folder_guid': str(savegame.folder_guid),
                     'file_guid': str(parsed_blob.file_guid),
                     'xuid': int(xuid),
-                    'blob_number': savegame.blob_number
+                    'blob_number': savegame.blob_number,
+                    'save_type': save_type
                 })
         return savegame_content
 
