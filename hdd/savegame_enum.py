@@ -62,7 +62,32 @@ class SavegameType(Enum):
 
 class SavegameEnumerator(object):
     def __init__(self):
-        pass
+        self.savegame_content = dict()
+
+    def _save_to_dict(self, parsed_index, savegame, parsed_blob, guid, xuid):
+        # Initially create guid dict
+        if not self.savegame_content.get(guid):
+            self.savegame_content.update({guid: dict()})
+            self.savegame_content[guid].update({
+                'name': parsed_index.name,
+                'aum_id': parsed_index.aum_id,
+                'type': parsed_index.type,
+                'id': parsed_index.id
+            })
+        if not self.savegame_content[guid].get('savegames'):
+            self.savegame_content[guid].update({'savegames':list()})
+        self.savegame_content[guid]['savegames'].append({
+            'filetime': str(savegame.filetime),
+            'filename': savegame.filename,
+            'filename_alt': savegame.filename_alt,
+            'filesize': savegame.filesize,
+            'text': savegame.text,
+            'folder_guid': str(savegame.folder_guid),
+            'file_guid': str(parsed_blob.file_guid),
+            'xuid': int(xuid),
+            'blob_number': savegame.blob_number,
+            'save_type': savegame.save_type
+        })
 
     def _generate_guid_filename(self, guid):
         return "{%s}" % guid.upper()
@@ -93,7 +118,6 @@ class SavegameEnumerator(object):
         return ContainerBlob.parse(data)
 
     def parse_savegamefolders(self, folderlist):
-        savegame_content = dict()
         for folderpath in folderlist:
             # foldername: 'u_xuid_guid' or 'm_guid' 
             foldername = os.path.basename(folderpath)
@@ -107,18 +131,6 @@ class SavegameEnumerator(object):
             log.debug("Parsing %s (AUM: %s, xuid: %s, guid: %s) with %i files" % (
                 parsed_index.name, parsed_index.aum_id, xuid, guid, len(parsed_index.files))
             )
-            # Initially create guid dict
-            if not savegame_content.get(guid):
-                savegame_content.update({guid: dict()})
-                savegame_content[guid].update({
-                    'name': parsed_index.name,
-                    'aum_id': parsed_index.aum_id,
-                    'type': parsed_index.type,
-                    'id': parsed_index.id
-                })
-            if not savegame_content[guid].get('savegames'):
-                savegame_content[guid].update({'savegames':list()})
-
             for savegame in parsed_index.files:
                 if not savegame.filesize:
                     log.debug("Savegame id: %s not available, skipping" % str(savegame.folder_guid))
@@ -130,19 +142,8 @@ class SavegameEnumerator(object):
                 log.debug("Enumerated savegame: %s %s (file: %s/%s)" % (
                     savegame.filename, savegame.text, str(savegame.folder_guid), str(parsed_blob.file_guid)
                 ))
-                savegame_content[guid]['savegames'].append({
-                    'filetime': str(savegame.filetime),
-                    'filename': savegame.filename,
-                    'filename_alt': savegame.filename_alt,
-                    'filesize': savegame.filesize,
-                    'text': savegame.text,
-                    'folder_guid': str(savegame.folder_guid),
-                    'file_guid': str(parsed_blob.file_guid),
-                    'xuid': int(xuid),
-                    'blob_number': savegame.blob_number,
-                    'save_type': savegame.save_type
-                })
-        return savegame_content
+                self._save_to_dict(parsed_index, savegame, parsed_blob, guid, xuid)
+        return self.savegame_content
 
     def get_folderlist(self, path):
         filelist = os.listdir(path)
