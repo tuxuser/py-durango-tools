@@ -10,6 +10,7 @@ import logging
 from construct import this, Struct, String, PascalString, Array, Padding
 from construct import Int8ul, Int16ul, Int32ul, Int64ul, HexDump, Bytes
 from common.adapters import PascalStringUtf16, UUIDAdapter, FILETIMEAdapter
+from common.enum import Enum
 
 logging.basicConfig(format='[%(levelname)s] - %(name)s - %(message)s', level=logging.DEBUG)
 log = logging.getLogger('savegame_enum')
@@ -33,12 +34,12 @@ ContainerIdxEntry = Struct(
     "filename_alt" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "text" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "blob_number" / Int8ul,
-    "unknown1" / Int32ul,
+    "save_type" / Int32ul,
     "folder_guid" / UUIDAdapter(),
     "filetime" / FILETIMEAdapter(),
-    "unknown2" / HexDump(Bytes(8)),
+    "unknown2" / Int64ul,
     "filesize" / Int32ul,
-    "unknown3" / HexDump(Bytes(4))
+    "unknown3" / Int32ul
 )
 
 """
@@ -50,14 +51,14 @@ ContainerIndex = Struct(
     "name" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "aum_id" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "filetime" / FILETIMEAdapter(),
-    "unknown" / HexDump(Bytes(4)),
+    "unknown" / Int32ul, # seen values 0, 1, 3 so far
     "id" / PascalStringUtf16(Int32ul, encoding="utf16"),
     "files" / Array(this.file_count, ContainerIdxEntry)
 )
 
-class SavegameType(object):
-    USER = "u"
-    MACHINE = "m"
+class SavegameType(Enum):
+    USER = 1
+    MACHINE = 5
 
 class SavegameEnumerator(object):
     def __init__(self):
@@ -66,18 +67,18 @@ class SavegameEnumerator(object):
     def _generate_guid_filename(self, guid):
         return "{%s}" % guid.upper()
 
-    def _get_xuid_guid_type_from_foldername(self, foldername):
+    def _get_xuid_guid_from_foldername(self, foldername):
         elements = foldername.split('_')
         save_type = elements[0]
-        if SavegameType.MACHINE == save_type:
+        if "m" == save_type: # machine
             guid = elements[1]
             xuid = "0"
-        elif SavegameType.USER == save_type:
+        elif "u" == save_type: # user
             xuid = elements[1]
             guid = elements[2]
         else:
             raise Exception("Encountered unknown savegametype")
-        return xuid, guid, save_type
+        return xuid, guid
 
     def _parse_savegameblob(self, path, savegame_guid, blob_num):
         guid_folder = self._generate_guid_filename(savegame_guid)
@@ -96,7 +97,7 @@ class SavegameEnumerator(object):
         for folderpath in folderlist:
             # foldername: 'u_xuid_guid' or 'm_guid' 
             foldername = os.path.basename(folderpath)
-            xuid, guid, save_type = self._get_xuid_guid_type_from_foldername(foldername)
+            xuid, guid = self._get_xuid_guid_from_foldername(foldername)
             # Assemble path to CONTAINERS_INDEX
             index_fpath = os.path.join(folderpath, CONTAINERS_INDEX)
             with io.open(index_fpath, 'rb') as f:
@@ -139,7 +140,7 @@ class SavegameEnumerator(object):
                     'file_guid': str(parsed_blob.file_guid),
                     'xuid': int(xuid),
                     'blob_number': savegame.blob_number,
-                    'save_type': save_type
+                    'save_type': savegame.save_type
                 })
         return savegame_content
 
