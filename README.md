@@ -1,6 +1,6 @@
-##Various python helper tools to deal with xbox one##
+## Various python helper tools to deal with xbox one ##
 
-#Notes#
+# Notes #
 Please use python3 for best compatibility. I didn't test with python2 at all.
 
 Use the following command to start the individual tools:
@@ -8,7 +8,7 @@ Use the following command to start the individual tools:
     python3 -m module
 If you try to start the *.py file directly, most likely the imports wont be resolved.
 
-#Content#
+# Content #
 
 ### hdd - Hard drive tools ###
 
