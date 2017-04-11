@@ -64,8 +64,9 @@ class SavegameEnumerator(object):
     def __init__(self):
         self.savegame_content = dict()
 
-    def _save_to_dict(self, parsed_index, savegame, parsed_blob, guid, xuid):
+    def _save_to_dict(self, parsed_index, savegame, parsed_blob, guid, xuid, savegame_path):
         # Initially create guid dict
+        guid = guid.lower()
         if not self.savegame_content.get(guid):
             self.savegame_content.update({guid: dict()})
             self.savegame_content[guid].update({
@@ -86,7 +87,8 @@ class SavegameEnumerator(object):
             'file_guid': str(parsed_blob.file_guid),
             'xuid': int(xuid),
             'blob_number': savegame.blob_number,
-            'save_type': savegame.save_type
+            'save_type': savegame.save_type,
+            'filepath': savegame_path
         })
 
     def _generate_guid_filename(self, guid):
@@ -104,6 +106,11 @@ class SavegameEnumerator(object):
         else:
             raise Exception("Encountered unknown savegametype")
         return xuid, guid
+
+    def _generate_savegame_path(self, folderpath, folder_guid, savegame_guid):
+        path = os.path.join(folderpath, self._generate_guid_filename(folder_guid))
+        path = os.path.join(path, self._generate_guid_filename(savegame_guid))
+        return path
 
     def _parse_savegameblob(self, path, savegame_guid, blob_num):
         guid_folder = self._generate_guid_filename(savegame_guid)
@@ -132,17 +139,19 @@ class SavegameEnumerator(object):
                 parsed_index.name, parsed_index.aum_id, xuid, guid, len(parsed_index.files))
             )
             for savegame in parsed_index.files:
+                folder_guid = str(savegame.folder_guid)
                 if not savegame.filesize:
-                    log.debug("Savegame id: %s not available, skipping" % str(savegame.folder_guid))
+                    log.debug("Savegame id: %s not available, skipping" % folder_guid)
                     continue
-                parsed_blob = self._parse_savegameblob(folderpath, str(savegame.folder_guid), savegame.blob_number)
+                parsed_blob = self._parse_savegameblob(folderpath, folder_guid, savegame.blob_number)
                 if not parsed_blob:
                     continue
-                savegame_file = self._generate_guid_filename(str(parsed_blob.file_guid))
-                log.debug("Enumerated savegame: %s %s (file: %s/%s)" % (
-                    savegame.filename, savegame.text, str(savegame.folder_guid), str(parsed_blob.file_guid)
+                file_guid = str(parsed_blob.file_guid)
+                savegame_path = self._generate_savegame_path(folderpath, folder_guid, file_guid)
+                log.debug("Enumerated savegame: %s %s (file: %s)" % (
+                    savegame.filename, savegame.text, savegame_path
                 ))
-                self._save_to_dict(parsed_index, savegame, parsed_blob, guid, xuid)
+                self._save_to_dict(parsed_index, savegame, parsed_blob, guid, xuid, savegame_path)
         return self.savegame_content
 
     def get_folderlist(self, path):
@@ -156,6 +165,20 @@ class SavegameEnumerator(object):
             filelist = [os.path.abspath(os.path.join(path, f)) for f in filelist]
             filelist = [f for f in filelist if os.path.exists(os.path.join(f, CONTAINERS_INDEX)) ]
             return filelist
+    
+    def get_title_node(self, guid=None, product_id=None, aum_id=None):
+        if not guid and not aum_id:
+            log.error('Need either guid, product_id or aum_id to locate title')
+            return
+        if guid:
+            guid = guid.lower()
+            node = self.savegame_content.get(guid)
+        elif product_id:
+            product_id = product_id.lower()
+            node = next((item for item in self.savegame_content.values() if item['id'] == product_id), None)
+        elif aum_id:
+            node = next((item for item in self.savegame_content.values() if item['aum_id'] == aum_id), None)
+        return node
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Enumerate savegame directory')
