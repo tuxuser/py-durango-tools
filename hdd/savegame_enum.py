@@ -94,7 +94,9 @@ class SavegameEnumerator(object):
     def _generate_guid_filename(self, guid):
         return "{%s}" % guid.upper()
 
-    def _get_xuid_guid_from_foldername(self, foldername):
+    def _get_xuid_guid_from_folderpath(self, folderpath):
+        # foldername: 'u_xuid_guid' or 'm_guid'
+        foldername = os.path.basename(folderpath)
         elements = foldername.split('_')
         save_type = elements[0]
         if "m" == save_type: # machine
@@ -112,29 +114,42 @@ class SavegameEnumerator(object):
         path = os.path.join(path, self._generate_guid_filename(savegame_guid))
         return path
 
-    def _parse_savegameblob(self, path, savegame_guid, blob_num):
-        guid_folder = self._generate_guid_filename(savegame_guid)
-        blob_name = "container.%i" % blob_num
-        filepath = os.path.join(path, guid_folder, blob_name)
+    def _generate_savegameblob_path(self, folderpath, folder_guid, blob_number):
+        guid = self._generate_guid_filename(folder_guid)
+        blob_name = "container.%i" % blob_number
+        return os.path.join(folderpath, guid, blob_name)
+
+    def _generate_containerindex_path(self, folderpath):
+        return os.path.join(folderpath, CONTAINERS_INDEX)
+
+    def parse_savegameblob(self, filepath):
         try:
             with io.open(filepath, 'rb') as f:
                 data = f.read()
         except FileNotFoundError as e:
-            log.warning("Savegame blob %s not existant -> should be there normally!, err: %s" % (savegame_guid, e))
+            log.error("parse_savegameblob: %s" % e)
             return
         return ContainerBlob.parse(data)
 
+    def parse_containterindex(self, filepath):
+        try:
+            with io.open(filepath, 'rb') as f:
+                data = f.read()
+        except FileNotFoundError as e:
+            log.error("parse_containerindex: %s" %  e)
+            return
+        return ContainerIndex.parse(data)
+
     def parse_savegamefolders(self, folderlist):
         for folderpath in folderlist:
-            # foldername: 'u_xuid_guid' or 'm_guid' 
-            foldername = os.path.basename(folderpath)
-            xuid, guid = self._get_xuid_guid_from_foldername(foldername)
-            # Assemble path to CONTAINERS_INDEX
-            index_fpath = os.path.join(folderpath, CONTAINERS_INDEX)
-            with io.open(index_fpath, 'rb') as f:
-                data = f.read()
+            xuid, guid = self._get_xuid_guid_from_folderpath(folderpath)
             log.debug("Parsing folder %s ..." % folderpath)
-            parsed_index = ContainerIndex.parse(data)
+            # Assemble path to CONTAINERS_INDEX
+            index_fpath = self._generate_containerindex_path(folderpath)
+            parsed_index = self.parse_containterindex(index_fpath)
+            if not parsed_index:
+                log.error("Container Index %s not existant -> should be there normally!" % index_fpath)
+                continue
             log.debug("Parsing %s (AUM: %s, xuid: %s, guid: %s) with %i files" % (
                 parsed_index.name, parsed_index.aum_id, xuid, guid, len(parsed_index.files))
             )
@@ -143,8 +158,10 @@ class SavegameEnumerator(object):
                 if not savegame.filesize:
                     log.debug("Savegame id: %s not available, skipping" % folder_guid)
                     continue
-                parsed_blob = self._parse_savegameblob(folderpath, folder_guid, savegame.blob_number)
+                blob_path = self._generate_savegameblob_path(folderpath, folder_guid, savegame.blob_number)
+                parsed_blob = self.parse_savegameblob(blob_path)
                 if not parsed_blob:
+                    log.error("Savegame blob %s not existant -> should be there normally!" % blob_path)
                     continue
                 file_guid = str(parsed_blob.file_guid)
                 savegame_path = self._generate_savegame_path(folderpath, folder_guid, file_guid)
