@@ -140,35 +140,38 @@ class SavegameEnumerator(object):
             return
         return ContainerIndex.parse(data)
 
+    def parse_savegamefolder(self, folderpath):
+        xuid, guid = self._get_xuid_guid_from_folderpath(folderpath)
+        log.debug("Parsing folder %s ..." % folderpath)
+        # Assemble path to CONTAINERS_INDEX
+        index_fpath = self._generate_containerindex_path(folderpath)
+        parsed_index = self.parse_containterindex(index_fpath)
+        if not parsed_index:
+            log.error("Container Index %s not existant -> should be there normally!" % index_fpath)
+            return
+        log.debug("Parsing %s (AUM: %s, xuid: %s, guid: %s) with %i files" % (
+            parsed_index.name, parsed_index.aum_id, xuid, guid, len(parsed_index.files))
+        )
+        for savegame in parsed_index.files:
+            folder_guid = str(savegame.folder_guid)
+            if not savegame.filesize:
+                log.debug("Savegame id: %s not available, skipping" % folder_guid)
+                continue
+            blob_path = self._generate_savegameblob_path(folderpath, folder_guid, savegame.blob_number)
+            parsed_blob = self.parse_savegameblob(blob_path)
+            if not parsed_blob:
+                log.error("Savegame blob %s not existant -> should be there normally!" % blob_path)
+                continue
+            file_guid = str(parsed_blob.file_guid)
+            savegame_path = self._generate_savegame_path(folderpath, folder_guid, file_guid)
+            log.debug("Enumerated savegame: %s %s (file: %s)" % (
+                savegame.filename, savegame.text, savegame_path
+            ))
+            self._save_to_dict(parsed_index, savegame, parsed_blob, guid, xuid, savegame_path)
+
     def parse_savegamefolders(self, folderlist):
         for folderpath in folderlist:
-            xuid, guid = self._get_xuid_guid_from_folderpath(folderpath)
-            log.debug("Parsing folder %s ..." % folderpath)
-            # Assemble path to CONTAINERS_INDEX
-            index_fpath = self._generate_containerindex_path(folderpath)
-            parsed_index = self.parse_containterindex(index_fpath)
-            if not parsed_index:
-                log.error("Container Index %s not existant -> should be there normally!" % index_fpath)
-                continue
-            log.debug("Parsing %s (AUM: %s, xuid: %s, guid: %s) with %i files" % (
-                parsed_index.name, parsed_index.aum_id, xuid, guid, len(parsed_index.files))
-            )
-            for savegame in parsed_index.files:
-                folder_guid = str(savegame.folder_guid)
-                if not savegame.filesize:
-                    log.debug("Savegame id: %s not available, skipping" % folder_guid)
-                    continue
-                blob_path = self._generate_savegameblob_path(folderpath, folder_guid, savegame.blob_number)
-                parsed_blob = self.parse_savegameblob(blob_path)
-                if not parsed_blob:
-                    log.error("Savegame blob %s not existant -> should be there normally!" % blob_path)
-                    continue
-                file_guid = str(parsed_blob.file_guid)
-                savegame_path = self._generate_savegame_path(folderpath, folder_guid, file_guid)
-                log.debug("Enumerated savegame: %s %s (file: %s)" % (
-                    savegame.filename, savegame.text, savegame_path
-                ))
-                self._save_to_dict(parsed_index, savegame, parsed_blob, guid, xuid, savegame_path)
+            self.parse_savegamefolder(folderpath)
         return self.savegame_content
 
     def get_folderlist(self, path):
