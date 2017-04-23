@@ -220,9 +220,8 @@ class DurangoNand(object):
 
     def parse(self):
         if not self.is_valid:
-            log.error("ERROR: NAND dump does not match expected filesize!")
-            log.error("Expecting 0x%08x or 0x%08x bytes dump!" % (FLASH_SIZE_LOG, FLASH_SIZE_RAW))
-            return
+            raise Exception("ERROR: Invalid filesize! Expected: 0x%08x or 0x%08x, Got: 0x%08x" % 
+                        (FLASH_SIZE_LOG, FLASH_SIZE_RAW, self.filesize))
 
         with io.open(self.filename, "rb") as f:
             # Search for fixed-offset filesystem header

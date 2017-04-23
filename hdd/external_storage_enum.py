@@ -93,16 +93,26 @@ class EDSScraper(object):
         return content_list
 
 class DurangoContentDirectory(object):
-    def __init__(self, folderpath):
-        self._rootpath = folderpath
-    
-    @property
-    def folderpath(self):
-        return self._rootpath
+    def __init__(self):
+        pass
+
+    def get_filtered_foldercontent(self, folderpath=None, filepaths=None):
+        if folderpath:
+            filelist = os.listdir(folderpath)
+        elif filepaths:
+            filelist = filepaths
+        else:
+            log.error('Need either folderpath or list of filepaths')
+            return list()
+        get_filext = lambda f: os.path.splitext(f)[1].lower()
+        filelist = [f for f in filelist if not os.path.isfile(f) or
+                                            f != LAST_CONSOLE_FILE or
+                                            get_filext(f) != XVI_EXTENSION]
+        return filelist
 
     def create_xvd_object(self, filepath):
         with io.open(filepath, 'rb') as f:
-            size = f.seek(0,2)
+            size = f.seek(0, os.SEEK_END)
             if size < XVD_HEADER_SIZE:
                 return
             f.seek(0)
@@ -123,15 +133,10 @@ class DurangoContentDirectory(object):
         if total % (percent*10):
             print("\r%i percent completed (%i/%i)" % ((current / percent), current, total), end="\r")
 
-    def parse(self):
+    def parse(self, filelist):
         files = dict()
         for group in ALL_MEDIAGROUPS:
             files.update({group: list()})
-        # Filter filelist initially - We only want files, no (sub)dirs, not LastConsole file
-        get_filext = lambda f: os.path.splitext(f)[1].lower()
-        filelist = [f for f in os.listdir(self._rootpath) if not os.path.isfile(f)]
-        filelist = [f for f in filelist if f != LAST_CONSOLE_FILE]
-        filelist = [f for f in filelist if get_filext(f) != XVI_EXTENSION]
         total_count = len(filelist)
         for idx, filename in enumerate(filelist):
             filepath = os.path.join(self._rootpath, filename)
@@ -172,8 +177,9 @@ if __name__ == "__main__":
         sys.exit(-3)
 
     log.info("Parsing folder: %s" % args.path)
-    content_dir = DurangoContentDirectory(args.path)
-    content_list = content_dir.parse()
+    content_dir = DurangoContentDirectory()
+    filelist = content_dir.get_filtered_foldercontent(args.path)
+    content_list = content_dir.parse(filelist)
 
     for group in ALL_MEDIAGROUPS:
         log.info('Found %i %s containers...' % (

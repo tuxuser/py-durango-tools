@@ -140,18 +140,12 @@ XvdFileHeader = Struct(
     "sandbox_id" / String(0x10),             # 0x38C
     "product_id" / UUIDAdapter(),            # 0x39C
     "build_id" / UUIDAdapter(),              # 0x3AC
-    "package_version_1" / Int16ul,           # 0x3BC
-    "package_version_2" / Int16ul,           # 0x3BE
-    "package_version_3" / Int16ul,           # 0x3C0
-    "package_version_4" / Int16ul,           # 0x3C2
+    "package_version" / Int64ul,             # 0x3BC
     "pe_catalog_info3" / Bytes(0xA0),        # 0x3C4
     "unknown6" / Int64ul,                    # 0x464
     "unknown7" / Int32ul,                    # 0x46C
     "unknown8" / Bytes(0x24),                # 0x470
-    "required_systemversion_1" / Int16ul,    # 0x494
-    "required_systemversion_2" / Int16ul,    # 0x496
-    "required_systemversion_3" / Int16ul,    # 0x498
-    "required_systemversion_4" / Int16ul,    # 0x49A
+    "required_systemversion" / Int64ul,    # 0x494
     "odk_keyslot_id" / Int32ul,              # 0x49C
     "reserved" / Padding(0xB60)              # 0x4A0
 )
@@ -225,12 +219,8 @@ class XvdFile(object):
         print("Sandbox Id: %s" % header.sandbox_id)
         print("Product Id: %s" % header.product_id)
         print("Build Id (PDUID): %s" % header.build_id)
-        print("Package version: %i.%i.%i.%i" % (
-            header.package_version_4, header.package_version_3, header.package_version_2, header.package_version_1
-        ))
-        print("Required System version: %i.%i.%i.%i" % (
-            header.required_systemversion_4, header.required_systemversion_3, header.required_systemversion_2, header.required_systemversion_1
-        ))
+        print("Package version: %i" % header.package_version)
+        print("Required System version: %i" % header.required_systemversion)
         print("ODK keyslot Id: 0x%x" % header.odk_keyslot_id)
         print("Encrypted CIK: %s" % hexlify(header.encrypted_cik))
         print("Flags:")

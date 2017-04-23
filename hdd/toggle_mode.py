@@ -15,7 +15,7 @@ ID_POSITION = SECTOR_SIZE - 2
 
 def toggle_drive(device, do_toggle=False):
     try:
-        disk = os.open(device, os.O_RDWR)
+        disk = os.open(device, os.O_RDWR | os.O_BINARY)
     except PermissionError as e:
         print("You might run the script as root/admin!")
         print(e)
