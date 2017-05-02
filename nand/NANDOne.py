@@ -14,12 +14,11 @@ import os
 import sys
 import logging
 import hashlib
-import binascii
 import argparse
 
-from construct import Int8ul, Int16ul, Int16ub
-from construct import Int32ul, Int32ub, Int64ul, Int64ub
-from construct import String, Bytes, Array, Padding, Struct
+from construct import Int8ul, Int16ul
+from construct import Int32ul, Int64ul
+from construct import Bytes, Array, Padding, Struct
 from common.adapters import UUIDAdapter
 
 logging.basicConfig(format='[%(levelname)s] - %(name)s - %(message)s', level=logging.DEBUG)
@@ -38,9 +37,7 @@ HEADER_MAGIC = b'XBFS'[::-1]
 
 HEADER_HASH_SIZE = 32
 
-HEADER_OFFSETS = [0x10000,
-                0x810000,
-                0x820000]
+HEADER_OFFSETS = [0x10000, 0x810000, 0x820000]
 
 GUID_SIZE = 16
 
@@ -115,13 +112,24 @@ class DurangoNand(object):
         elif self.filesize == FLASH_SIZE_RAW:
             self.dump_type = "LOGICAL"
         else:
-            self.dump_type = "INVALID"
-            self.is_valid = False
+            raise Exception("ERROR: Invalid filesize! Expected: 0x%08x or 0x%08x, Got: 0x%08x" % (
+                FLASH_SIZE_LOG, FLASH_SIZE_RAW, self.filesize))
+        self.blocks = self.size_to_log_block(self.filesize)
 
-    def _hash(self, data):
+    @property
+    def tables(self):
+        return self.xbfs_tables
+
+    @property
+    def total_blocks(self):
+        return self.blocks
+
+    @staticmethod
+    def hash(data):
         return hashlib.sha256(data).digest()
 
-    def _save_file(self, buf, dirname, filename):
+    @staticmethod
+    def save_file(buf, dirname, filename):
         try:
             os.mkdir(dirname)
         except FileExistsError as e:
@@ -132,11 +140,27 @@ class DurangoNand(object):
             dest_fd.write(buf)
             dest_fd.flush()
 
-    def _log_block_to_size(self, value):
+    @staticmethod
+    def log_block_to_size(value):
         return value * LOG_BLOCK_SZ
-    
-    def _size_to_log_block(self, value):
-        return value / LOG_BLOCK_SZ
+
+    @staticmethod
+    def size_to_log_block(value):
+        return int(value / LOG_BLOCK_SZ)
+
+    def get_used_blockcount(self):
+        used_blocks = list()
+        files = [table.files for table in self.xbfs_tables]
+        for container in files:
+            for f in container:
+                block_range = range(f.offset, f.offset + f.size)
+                used_blocks.extend(block_range)
+        #remove duplicates
+        used_blocks = list(set(used_blocks))
+        return len(used_blocks)
+
+    def get_free_blockcount(self):
+        return self.blocks - self.get_used_blockcount()
 
     def get_header_rawoffset(self, seq_version):
         return self.header_offsets[seq_version]
@@ -165,6 +189,15 @@ class DurangoNand(object):
         latest_seq = self.get_latest_sequence_version()
         return self.get_xbfs_table_by_sequence(latest_seq)
 
+    def get_filelist(self, table):
+        filelist = list()
+        for index, filename in enumerate(FlashFiles):
+            file = table.files[index]
+            if not file.size:
+                continue
+            filelist.append((filename, file.offset, file.size))
+        return filelist
+
     def get_xbfs_fileentry_by_name(self, name, table):
         try:
             index = FlashFiles.index(name)
@@ -182,33 +215,54 @@ class DurangoNand(object):
         entry = self.get_xbfs_fileentry_by_name(filename, table)
         if not entry:
             return
-        offset = self._log_block_to_size(entry.offset)
-        size = self._log_block_to_size(entry.size)
+        offset = self.log_block_to_size(entry.offset)
+        size = self.log_block_to_size(entry.size)
         with io.open(self.filename, "rb") as f:
             f.seek(offset)
             return f.read(size)
 
-    def print_info(self, table):
-        header_offset = self.get_header_rawoffset(table.sequence_version)
-        log.info("-- XBFS table info --")
-        log.info("Header Offset: 0x%08x" % header_offset)
-        log.info("Format: %i" % table.format_version)
-        log.info("Sequence: %i" % table.sequence_version)
-        log.info("Layout: %i" % table.layout_version)
-        log.info("Guid: %s" % table.guid)
-        log.info("Hash: %s" % binascii.hexlify(table.hash).decode('utf-8'))
+    def generate_overview_details(self):
+        used_blocks = self.get_used_blockcount()
+        free_blocks = self.get_free_blockcount()
+        used_space = self.log_block_to_size(used_blocks)
+        free_space = self.log_block_to_size(free_blocks)
+        text = 'General info\n\n'
+        text += 'Dump Type: %s\n' % self.dump_type
+        text += 'Blockcount: 0x%X\n' % self.total_blocks
+        text += 'Total size: 0x%X (%i MB)\n' % (self.filesize, self.filesize / 1024 / 1024)
+        text += 'Blocks used: 0x%X (%i MB)\n' % (used_blocks,  used_space / 1024 / 1024)
+        text += 'Blocks free: 0x%X (%i MB)\n' % (free_blocks,  free_space / 1024 / 1024)
+        return text
 
-    def print_filelist(self, table):
-        log.info("-- XBFS filelist --")
-        for filename in FlashFiles:
-            fil = self.get_xbfs_fileentry_by_name(filename, table)
-            if not fil:
-                continue
-            offset = self._log_block_to_size(fil.offset)
-            size = self._log_block_to_size(fil.size)
-            log.info("off: 0x%08x, sz: 0x%08x, file: %s" % (
+    def generate_xbfs_details(self, table):
+        header_offset = self.get_header_rawoffset(table.sequence_version)
+        text = 'Xbox Boot Filesystem\n\n'
+        text += 'Header offset: 0x%X\n' % header_offset
+        text += 'Format version: %s\n' % table.format_version
+        text += 'Sequence version: %s\n' % table.sequence_version
+        text += 'Layout version: %s\n' % table.layout_version
+        text += 'GUID: %s\n' % str(table.guid)
+        #text += 'Hash\n'
+        #text += '%s\n' % binascii.hexlify(table.hash).decode('utf-8')
+        return text
+
+    def generate_file_details(self, file_tuple):
+        filename, offset, size = file_tuple
+        text = 'File-Entry\n\n'
+        text += 'Filename: %s\n' % filename
+        text += 'Offset: 0x%X\n' % offset
+        text += 'Size: 0x%X\n' % size
+        return text
+
+    def generate_filelist_details(self, table):
+        text = "Filelist\n\n"
+        for filename, offset, size in self.get_filelist(table):
+            offset = self.log_block_to_size(offset)
+            size = self.log_block_to_size(size)
+            text += "off: 0x%08x, sz: 0x%08x, file: %s\n" % (
                 offset, size, filename
-            ))
+            )
+        return text
 
     def extract_files_from_table(self, table, dest_dir):
         for filename in FlashFiles:
@@ -216,13 +270,9 @@ class DurangoNand(object):
             if not data:
                 continue
             log.info("Extracting file %s.." % filename)
-            self._save_file(data, dest_dir, filename)
+            self.save_file(data, dest_dir, filename)
 
     def parse(self):
-        if not self.is_valid:
-            raise Exception("ERROR: Invalid filesize! Expected: 0x%08x or 0x%08x, Got: 0x%08x" % 
-                        (FLASH_SIZE_LOG, FLASH_SIZE_RAW, self.filesize))
-
         with io.open(self.filename, "rb") as f:
             # Search for fixed-offset filesystem header
             for offset in HEADER_OFFSETS:
@@ -231,7 +281,7 @@ class DurangoNand(object):
                 header = FlashHeader.parse(data)
                 if header.magic != HEADER_MAGIC:
                     continue
-                hash = self._hash(data[:-HEADER_HASH_SIZE])
+                hash = self.hash(data[:-HEADER_HASH_SIZE])
                 self.xbfs_tables.append(header)
                 self.header_offsets[header.sequence_version] = offset
 
@@ -258,8 +308,9 @@ if __name__ == '__main__':
     table = nand.get_latest_xbfs_table()
     log.info("Available Sequences: %s" % nand.get_xbfs_sequence_list())
     log.info("Latest sequence num: %i" % table.sequence_version)
-    nand.print_info(table)
-    nand.print_filelist(table)
+    log.info(nand.generate_overview_details())
+    log.info(nand.generate_xbfs_details(table))
+    log.info(nand.generate_filelist_details(table))
     if args.extract:
         log.info("Extracting files...")
         dirname = "%s_%s" % (args.filename, table.guid)

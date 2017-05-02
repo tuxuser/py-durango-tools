@@ -15,7 +15,7 @@ ID_POSITION = SECTOR_SIZE - 2
 
 def toggle_drive(device, do_toggle=False):
     try:
-        disk = os.open(device, os.O_RDWR | os.O_BINARY)
+        disk = os.open(device, os.O_RDWR)
     except PermissionError as e:
         print("You might run the script as root/admin!")
         print(e)
@@ -49,4 +49,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("Xbox One USB Hdd mode toggler")
-    toggle_device(args.blockdevice, args.toggle)
+    toggle_drive(args.blockdevice, args.toggle)

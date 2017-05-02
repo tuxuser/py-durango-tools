@@ -8,7 +8,6 @@ import argparse
 import logging
 
 from fileformat.xvd import XvdFile, XvdContentType
-from fileformat.xvd import XVD_HEADER_SIZE, XVD_TYPE_APP, XVD_TYPE_GAME
 
 from xbox_webapi.authentication.auth import AuthenticationManager
 from xbox_webapi.common.exceptions import AuthenticationException
@@ -23,7 +22,39 @@ LAST_CONSOLE_FILE = "LastConsole"
 TOKEN_DIR = "tokenstore.json"
 
 ALL_MEDIAGROUPS = [MediaGroup.GAME_TYPE, MediaGroup.APP_TYPE]
-DESIRED_FIELDS_SCRAPE = ['Images','VuiDisplayName']
+DESIRED_FIELDS_SCRAPE = ['Images', 'VuiDisplayName']
+
+XVD_TYPE_APP = [
+    XvdContentType.Application,
+    XvdContentType.AppDLC,
+    XvdContentType.UWA
+]
+
+XVD_TYPE_GAME = [
+    XvdContentType.Title,
+    XvdContentType.TitleDLC
+]
+
+XVD_TYPE_X360 = [
+    XvdContentType.X360FATX,
+    XvdContentType.X360GDFX,
+    XvdContentType.X360STFS
+]
+
+XVD_TYPE_SYSTEM = [
+    XvdContentType.Data,
+    XvdContentType.SystemOS,
+    XvdContentType.EraOS,
+    XvdContentType.Scratch,
+    XvdContentType.ResetData,
+    XvdContentType.HostOS,
+    XvdContentType.Updater,
+    XvdContentType.OfflineUpdater,
+    XvdContentType.Template,
+    XvdContentType.SystemTools,
+    XvdContentType.SystemAux,
+    XvdContentType.SystemData
+]
 
 class EDSScraper(object):
     '''
@@ -38,7 +69,6 @@ class EDSScraper(object):
         return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
     def create_client(self, email=None, password=None):
-        auth_result = None
         auth_mgr = AuthenticationManager(TOKEN_DIR)
         try:
             tokenstore = auth_mgr.authenticate(email_address=email, password=password)
@@ -92,34 +122,31 @@ class EDSScraper(object):
                     entry['image_boxart'] = matched_item.get('Images', [{}])[0].get('Url')
         return content_list
 
-class DurangoContentDirectory(object):
+
+class XvdHandler(object):
     def __init__(self):
         pass
 
-    def get_filtered_foldercontent(self, folderpath=None, filepaths=None):
+    @staticmethod
+    def get_filtered_foldercontent(folderpath=None, filepaths=None):
         if folderpath:
             filelist = os.listdir(folderpath)
+            filelist = [os.path.join(folderpath, f) for f in filelist]
         elif filepaths:
             filelist = filepaths
         else:
             log.error('Need either folderpath or list of filepaths')
             return list()
-        get_filext = lambda f: os.path.splitext(f)[1].lower()
-        filelist = [f for f in filelist if not os.path.isfile(f) or
-                                            f != LAST_CONSOLE_FILE or
-                                            get_filext(f) != XVI_EXTENSION]
-        return filelist
 
-    def create_xvd_object(self, filepath):
-        with io.open(filepath, 'rb') as f:
-            size = f.seek(0, os.SEEK_END)
-            if size < XVD_HEADER_SIZE:
-                return
-            f.seek(0)
-            buf = f.read(XVD_HEADER_SIZE)
-        return XvdFile(buf)
+        def get_filext(filepath):
+            return os.path.splitext(filepath)[1].lower()
 
-    def get_media_group_for_type(self, content_type):
+        return [f for f in filelist if os.path.isfile(f) and
+                f != LAST_CONSOLE_FILE and
+                get_filext(f) != XVI_EXTENSION]
+
+    @staticmethod
+    def get_media_group_for_type(content_type):
         if content_type in XVD_TYPE_APP:
             return MediaGroup.APP_TYPE
         elif content_type in XVD_TYPE_GAME:
@@ -128,28 +155,32 @@ class DurangoContentDirectory(object):
             log.warning('Cannot find media group for content-type: 0x%x' % content_type)
             return None
 
-    def show_parse_progress(self, total, current):
+    @staticmethod
+    def show_parse_progress(total, current):
         percent = total / 100
         if total % (percent*10):
             print("\r%i percent completed (%i/%i)" % ((current / percent), current, total), end="\r")
 
+    @staticmethod
     def parse(self, filelist):
         files = dict()
         for group in ALL_MEDIAGROUPS:
             files.update({group: list()})
         total_count = len(filelist)
-        for idx, filename in enumerate(filelist):
-            filepath = os.path.join(self._rootpath, filename)
-            self.show_parse_progress(total_count, idx)
-            xvd = self.create_xvd_object(filepath)
-            if not xvd or not xvd.is_valid:
+        for idx, filepath in enumerate(filelist):
+            XvdHandler.show_parse_progress(total_count, idx)
+            try:
+                xvd = XvdFile(filepath)
+            except Exception as e:
+                log.error('Invalid file: %s, Error: %s' % (filepath, e))
                 continue
-            media_group = self.get_media_group_for_type(xvd.content_type)
+            header = xvd.header
+            media_group = XvdHandler.get_media_group_for_type(header.content_type)
             entry = {
                 'filepath': filepath,
-                'product_id': str(xvd.product_id),
-                'content_type': xvd.content_type,
-                'type': XvdContentType.get_string_for_value(xvd.content_type)
+                'product_id': str(header.product_id),
+                'content_type': header.content_type,
+                'type': XvdContentType.get_string_for_value(header.content_type)
             }
             files[media_group].append(entry)
         return files
@@ -177,9 +208,8 @@ if __name__ == "__main__":
         sys.exit(-3)
 
     log.info("Parsing folder: %s" % args.path)
-    content_dir = DurangoContentDirectory()
-    filelist = content_dir.get_filtered_foldercontent(args.path)
-    content_list = content_dir.parse(filelist)
+    files = XvdHandler.get_filtered_foldercontent(args.path)
+    content_list = XvdHandler.parse(files)
 
     for group in ALL_MEDIAGROUPS:
         log.info('Found %i %s containers...' % (
