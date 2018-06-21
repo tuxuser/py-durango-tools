@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "type": "game",
+      "isXvc": true,
+      "contentId": "ff28e81e-3de5-4806-a5d5-395f69855e5a",
+      "productId": "047d4b49-1214-4f02-9035-1952890c996f",
+      "packageFamilyName": "LittleNightmares_ntm4d3b98hw5m",
+      "oneStoreProductId": "BWD88K55MK5W",
+      "version": "281474976710661",
+      "size": 7151329280,
+      "allowedProductId": "",
+      "allowedPackageFamilyName": "",
+      "path": "/col/content/%7B1AA1C502-1478-11E5-8D85-806E6F6E6963%7D%23%7BFF28E81E-3DE5-4806-A5D5-395F69855E5A%7D",
+      "availability": "available",
+      "relatedMedia": [],
+      "relatedMediaFamilyNames": []
+    }
+  ]
+}

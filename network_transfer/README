@@ -1,0 +1,16 @@
+## CLIENT ##
+Run:
+    python3 network_transfer_client.py
+
+## SERVER ##
+Create the following dir structure inside project dir:
+
+col/
+col/metadata [json metadata]
+col/content/
+col/content/{SOME_GUID}#{OTHER_GUID} [xvd files, corresponding to metadata path]
+col/constraint/
+col/constraint/{SOME_GUID}#{OTHER_GUID} [constraint files (???), path from meta$
+
+Run:
+    python3 network_transfer_server.py [local ip address]
