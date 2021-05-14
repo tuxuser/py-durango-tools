@@ -2,7 +2,7 @@ import sys
 import io
 from requests import Session
 from durango.common.ms_cv import MsCorrelationVector
-from durango.network_transfer.marketplace_catalog import CatalogJson
+from durango.network_transfer.marketplace_catalog import MarketplaceCatalog
 from durango.network_transfer.metadata import \
     NetworkTransferMetadataManager
 
@@ -88,14 +88,14 @@ def main():
     store = StoreDownloader()
     # Check for games
     resp = store.search_game(search_query)
-    games_catalog = CatalogJson(resp.json())
+    games_catalog = MarketplaceCatalog(**resp.json())
     # Check for apps
     resp = store.search_app(search_query)
-    apps_catalog = CatalogJson(resp.json())
+    apps_catalog = MarketplaceCatalog(resp.json())
 
     # Put results from both searches together
-    products = games_catalog.get_products()
-    products.extend(apps_catalog.get_products())
+    products = games_catalog.Products
+    products.extend(apps_catalog.Products)
     if not len(products):
         print("No Products found!")
         sys.exit(1)

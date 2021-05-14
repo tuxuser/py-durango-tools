@@ -1,29 +1,30 @@
+from typing import List
 import io
 import sys
 import json
 from urllib import parse
-from jsonobject import *
+from pydantic import BaseModel
 
 
-class MetadataItem(JsonObject):
-    type = StringProperty()
-    isXvc = BooleanProperty()
-    contentId = StringProperty()
-    productId = StringProperty()
-    packageFamilyName = StringProperty()
-    oneStoreProductId = StringProperty()
-    version = StringProperty()
-    size = IntegerProperty()
-    allowedProductId = StringProperty()
-    allowedPackageFamilyName = StringProperty()
-    path = StringProperty()
-    availability = StringProperty()
-    relatedMedia = ListProperty(str)
-    relatedMediaFamilyNames = ListProperty(str)
+class MetadataItem(BaseModel):
+    type: str
+    isXvc: bool
+    contentId: str
+    productId: str
+    packageFamilyName: str
+    oneStoreProductId: str
+    version: str
+    size: int
+    allowedProductId: str
+    allowedPackageFamilyName: str
+    path: str
+    availability: str
+    relatedMedia: List[str]
+    relatedMediaFamilyNames: List[str]
 
 
-class NetworkTransferMetadata(JsonObject):
-    items = ListProperty(MetadataItem)
+class NetworkTransferMetadata(BaseModel):
+    items: List[MetadataItem]
 
 
 class NetworkTransferMetadataManager(object):
@@ -35,16 +36,16 @@ class NetworkTransferMetadataManager(object):
         try:
             with io.open(self._filepath, 'rt') as f:
                 data = json.load(f)
-                self._metadata = NetworkTransferMetadata(data)
+                self._metadata = NetworkTransferMetadata(**data)
         except Exception as e:
             print('Metadata file could not be opened: %s' % e)
             print('Creating a fresh dict')
-            self._metadata = {'items': list()}
+            self._metadata = NetworkTransferMetadata(items=list())
 
     def commit(self):
         try:
             with io.open(self._filepath, 'wt') as f:
-                json.dump(self._metadata, f, indent=3)
+                json.dump(self._metadata.dict(), f, indent=3)
         except Exception as e:
             print('Failed to write metadata: %s' % e)
 
@@ -65,7 +66,7 @@ class NetworkTransferMetadataManager(object):
             relatedMedia=[],
             relatedMediaFamilyNames=[]
         )
-        self._metadata['items'].append(item.to_json())
+        self._metadata.items.append(item)
 
 
 def main():

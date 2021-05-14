@@ -13,7 +13,7 @@ with open('HISTORY.rst') as history_file:
 requirements = [
     'construct',
     'requests',
-    'jsonobject',
+    'pydantic',
     'netifaces',
     'hexdump'
 ]
