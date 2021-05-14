@@ -48,7 +48,7 @@ class NetworkTransferClient(object):
         return resp
 
     def download_onestore_info(self, metadata):
-        onestore_ids = [item.oneStoreProductId for item in metadata.items]
+        onestore_ids = [item.oneStoreProductId for item in metadata.items if item.oneStoreProductId]
         downloader = StoreDownloader()
         resp = downloader.get_from_onestore_ids(onestore_ids)
         info = resp.json().get('Products')
