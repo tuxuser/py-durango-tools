@@ -1,14 +1,14 @@
-from typing import List
+from typing import List, Optional
 import io
 import sys
 import json
 from urllib import parse
 from pydantic import BaseModel
-
+from .marketplace_catalog import Product, _Package
 
 class MetadataItem(BaseModel):
     type: str
-    isXvc: bool
+    isXvc: Optional[bool]
     contentId: str
     productId: str
     packageFamilyName: str
@@ -49,7 +49,7 @@ class NetworkTransferMetadataManager(object):
         except Exception as e:
             print('Failed to write metadata: %s' % e)
 
-    def add_entry(self, product, package, xvdpath, size):
+    def add_entry(self, product: Product, package: _Package, xvdpath: str, size: int):
         item = MetadataItem(
             type=product.get_type(),
             isXvc=True,
@@ -57,7 +57,7 @@ class NetworkTransferMetadataManager(object):
             productId=product.get_product_id(),
             packageFamilyName=product.get_package_family_name(),
             oneStoreProductId=product.get_onestore_id(),
-            version=product.get_version(),
+            version=package.get_version(),
             size=size,
             allowedProductId="",
             allowedPackageFamilyName="",

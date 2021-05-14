@@ -1,19 +1,20 @@
+from typing import List
 import logging
 import socket
 from durango.network_transfer.zeroconf import \
-    ServiceBrowser, Zeroconf, ServiceStateChange, ServiceInfo
+    ServiceBrowser, Zeroconf, ServiceStateChange, ServiceInfo, ZeroconfServiceTypes
 
 logger = logging.getLogger(__name__)
 
 
 class NetworkTransferConsole(object):
-    def __init__(self, server_name, name, liveid, address):
+    def __init__(self, server_name: str, name: str, liveid: str, address: str):
         self.server_name = server_name
         self.name = name
         self.liveid = liveid
         self.address = address
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '%s, Name: %s, LiveID: %s, Address: %s' % (self.server_name,
                                                           self.name,
                                                           self.liveid,
@@ -27,18 +28,18 @@ class NetworkTransferMDNS(object):
 
     def __init__(self):
         self._zc = Zeroconf()
-        self._consoles = list()
+        self._consoles: List[NetworkTransferConsole] = list()
         self._service_info = None
 
     @property
-    def consoles(self):
+    def consoles(self) -> List[NetworkTransferConsole]:
         return self._consoles
 
     @property
-    def service_info(self):
+    def service_info(self) -> ServiceInfo:
         return self._service_info
 
-    def _discover_cb(self, zeroconf, service_type, name, state_change):
+    def _discover_cb(self, zeroconf: Zeroconf, service_type: ZeroconfServiceTypes, name: str, state_change):
         logger.debug("Service %s of type %s state changed: %s" % (name, service_type, state_change))
         info = zeroconf.get_service_info(service_type, name)
 
@@ -63,7 +64,7 @@ class NetworkTransferMDNS(object):
         ServiceBrowser(self._zc, NetworkTransferMDNS.SERVICE_TYPE,
                        handlers=[self._discover_cb])
 
-    def _prepare_serviceinfo(self, name, liveid, address, port):
+    def _prepare_serviceinfo(self, name: str, liveid: str, address: str, port: int):
         mdns_name = '%s.%s' % (liveid, NetworkTransferMDNS.SERVICE_TYPE)
         server_name = '%s.local.' % name
         ipaddr = socket.inet_aton(address)
@@ -81,7 +82,7 @@ class NetworkTransferMDNS(object):
                                          properties=properties,
                                          server=server_name)
 
-    def register_service(self, name, liveid, address, port):
+    def register_service(self, name: str, liveid: str, address: str, port: int):
         self._prepare_serviceinfo(name, liveid, address, port)
         self._zc.register_service(self._service_info)
 
