@@ -126,7 +126,7 @@ class NetworkTransferClient(object):
             logger.error('Invalid data passed to objectify_metadata')
             return
 
-        return NetworkTransferMetadata(data)
+        return NetworkTransferMetadata(**data)
 
 
 def main():
