@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 import io
 import sys
 import json
@@ -8,7 +8,7 @@ from .marketplace_catalog import Product, _Package
 
 class MetadataItem(BaseModel):
     type: str
-    isXvc: Optional[bool]
+    isXvc: bool | None = None
     contentId: str
     productId: str
     packageFamilyName: str

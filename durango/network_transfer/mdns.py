@@ -2,7 +2,7 @@ from typing import List
 import logging
 import socket
 from durango.network_transfer.zeroconf import \
-    ServiceBrowser, Zeroconf, ServiceStateChange, ServiceInfo, ZeroconfServiceTypes
+    ServiceBrowser, Zeroconf, ServiceInfo, ServiceStateChange
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class NetworkTransferMDNS(object):
     def service_info(self) -> ServiceInfo:
         return self._service_info
 
-    def _discover_cb(self, zeroconf: Zeroconf, service_type: ZeroconfServiceTypes, name: str, state_change):
+    def _discover_cb(self, zeroconf: Zeroconf, service_type, name: str, state_change):
         logger.debug("Service %s of type %s state changed: %s" % (name, service_type, state_change))
         info = zeroconf.get_service_info(service_type, name)
 

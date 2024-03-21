@@ -8,14 +8,14 @@ from requests import Request, Response, Session
 from durango.common.ms_cv import MsCorrelationVector
 from durango.network_transfer.mdns import NetworkTransferMDNS
 from durango.network_transfer.metadata import \
+    MetadataItem, \
     NetworkTransferMetadata
 from durango.network_transfer.store_downloader import StoreDownloader
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-
-def print_progress(i, current_val, max_val):
+def print_progress(i, current_val, max_val) -> None:
     current_val = int(current_val / 1024 / 1024)
     max_val = int(max_val / 1024 / 1024)
     sys.stdout.write(' (%i / %i MB)' % (current_val, max_val))
@@ -31,7 +31,7 @@ class NetworkTransferClient(object):
     def __init__(self):
         self.session = Session()
 
-    def _get(self, url, headers):
+    def _get(self, url: str, headers: dict) -> Response:
         req = Request('GET', url, headers=headers)
         prepared = self.session.prepare_request(req)
         for header in self.IGNORE_HEADERS:
@@ -47,7 +47,7 @@ class NetworkTransferClient(object):
         resp.raise_for_status()
         return resp
 
-    def download_onestore_info(self, metadata):
+    def download_onestore_info(self, metadata: NetworkTransferMetadata) -> dict:
         onestore_ids = [item.oneStoreProductId for item in metadata.items if item.oneStoreProductId]
         downloader = StoreDownloader()
         resp = downloader.get_from_onestore_ids(onestore_ids)
@@ -58,7 +58,7 @@ class NetworkTransferClient(object):
             sorted_dict.update({i['ProductId']: i})
         return sorted_dict
 
-    def _download_chunk(self, url, start_pos, end_pos):
+    def _download_chunk(self, url: str, start_pos: int, end_pos: int) -> Response:
         headers = {
             'Range': 'bytes=%i-%i' % (start_pos, end_pos),
             'MS-CV': MsCorrelationVector().get_value(),
@@ -66,7 +66,7 @@ class NetworkTransferClient(object):
         }
         return self._get(url, headers=headers)
 
-    def download_item(self, address, entry):
+    def download_item(self, address: str, entry: MetadataItem) -> None:
         content_url = 'http://%s%s' % (address, entry.path)
         constraint_url = content_url.replace('content', 'constraint')
         # Request null position
@@ -86,7 +86,7 @@ class NetworkTransferClient(object):
                 cf.write(resp.content)
             print('Downloaded constraint file to: %s' % entry.contentId + '.constraint')
         except Exception as e:
-            print('FAILED TO DOWNLOAD CONSTRAINT!')
+            print(f'FAILED TO DOWNLOAD CONSTRAINT! exc: {e}')
 
         # Download the xvd blob
         with io.open(entry.contentId, 'wb') as f:
@@ -107,7 +107,7 @@ class NetworkTransferClient(object):
             print_progress(100, total_size, total_size)
             f.flush()
 
-    def download_metadata(self, address):
+    def download_metadata(self, address: str) -> Response:
         headers = {
             'Accept': 'application/json',
             'User-Agent': 'CopyOnLanSvc'
@@ -115,7 +115,7 @@ class NetworkTransferClient(object):
         return self._get('http://%s/col/metadata' % address, headers=headers)
 
     @staticmethod
-    def objectify_metadata(metadata):
+    def objectify_metadata(metadata: Response | str | dict) -> NetworkTransferMetadata:
         if isinstance(metadata, Response):
             data = metadata.json()
         elif isinstance(metadata, str):
